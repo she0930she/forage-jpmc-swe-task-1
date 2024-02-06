@@ -104,7 +104,9 @@ def clear_order(order, size, book, op=operator.ge, _notional=0):
         (notional, new_book) if successful, and None if not.  _notional is a
         recursive accumulator and should not be provided by the caller.
     """
+    # acquire sell's top info and the second-to-last info if exists
     (top_order, top_size, age), tail = book[0], book[1:]
+    print("clear_order: ", order, top_order)
     if op(order, top_order):
         _notional += min(size, top_size) * top_order
         sdiff = top_size - size
@@ -126,6 +128,7 @@ def clear_book(buy=None, sell=None):
             buy = buy[1:]
         else:
             break
+    print(buy,sell)
     return buy, sell
 
 
@@ -137,8 +140,15 @@ def order_book(orders, book, stock_name):
     for t, stock, side, order, size in orders:
         if stock_name == stock:
             new = add_book(book.get(side, []), order, size)
+            # for item in new:
+            #     print(item)
+
+            # assign buy:[], or sell:[] in dict()
+            # sort by side(float, 118.24 that one, reverse order)
             book[side] = sorted(new, reverse=side == 'buy', key=lambda x: x[0])
+            print("book: ", book)
         bids, asks = clear_book(**book)
+        print("bids: ", bids, "asks: ", asks)
         yield t, bids, asks
 
 
@@ -263,10 +273,12 @@ class App(object):
         self._sim_start, _, _ = next(self._data_1)
         self.read_10_first_lines()
 
+    # getter and setter
     @property
     def _current_book_1(self):
         for t, bids, asks in self._data_1:
             if REALTIME:
+                # print("sim:", self._sim_start+ (datetime.now() - self._rt_start))
                 while t > self._sim_start + (datetime.now() - self._rt_start):
                     yield t, bids, asks
             else:
@@ -276,6 +288,7 @@ class App(object):
     def _current_book_2(self):
         for t, bids, asks in self._data_2:
             if REALTIME:
+                # print("sim:", self._sim_start + (datetime.now() - self._rt_start))
                 while t > self._sim_start + (datetime.now() - self._rt_start):
                     yield t, bids, asks
             else:
@@ -301,19 +314,22 @@ class App(object):
             t2, bids2, asks2 = next(self._current_book_2)
         t = t1 if t1 > t2 else t2
         print('Query received @ t%s' % t)
-        return [{
-            'id': x and x.get('id', None),
-            'stock': 'ABC',
-            'timestamp': str(t),
-            'top_bid': bids1 and {
-                'price': bids1[0][0],
-                'size': bids1[0][1]
+        print("bids1", bids1, asks1, x)
+        print("bids2", bids2, asks2, x)
+        return [
+            {
+                'id': x and x.get('id', None),
+                'stock': 'ABC',
+                'timestamp': str(t),
+                'top_bid': bids1 and {
+                    'price': bids1[0][0],
+                    'size': bids1[0][1]
+                },
+                'top_ask': asks1 and {
+                    'price': asks1[0][0],
+                    'size': asks1[0][1]
+                }
             },
-            'top_ask': asks1 and {
-                'price': asks1[0][0],
-                'size': asks1[0][1]
-            }
-        },
             {
                 'id': x and x.get('id', None),
                 'stock': 'DEF',
